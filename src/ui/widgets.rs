@@ -41,8 +41,19 @@ pub fn hgradient_rounded(p: &egui::Painter, rect: Rect, left: Color32, right: Co
         p.rect_filled(rect, CornerRadius::same(radius), lerp_color(left, right, 0.5));
         return;
     }
-    p.rect_filled(Rect::from_min_max(rect.min, pos2(rect.min.x + 2.0 * r, rect.max.y)), CornerRadius { nw: radius, sw: radius, ne: 0, se: 0 }, left);
-    p.rect_filled(Rect::from_min_max(pos2(rect.max.x - 2.0 * r, rect.min.y), rect.max), CornerRadius { nw: 0, sw: 0, ne: radius, se: radius }, right);
+    // Each cap is clipped to its own strip so translucent colors don't overlap (no visible bands).
+    let left_strip = Rect::from_min_max(rect.min, pos2(rect.min.x + r, rect.max.y));
+    let right_strip = Rect::from_min_max(pos2(rect.max.x - r, rect.min.y), rect.max);
+    p.with_clip_rect(left_strip.intersect(p.clip_rect())).rect_filled(
+        Rect::from_min_max(rect.min, pos2(rect.min.x + 2.0 * r, rect.max.y)),
+        CornerRadius { nw: radius, sw: radius, ne: 0, se: 0 },
+        left,
+    );
+    p.with_clip_rect(right_strip.intersect(p.clip_rect())).rect_filled(
+        Rect::from_min_max(pos2(rect.max.x - 2.0 * r, rect.min.y), rect.max),
+        CornerRadius { nw: 0, sw: 0, ne: radius, se: radius },
+        right,
+    );
     hgradient(p, Rect::from_min_max(pos2(rect.min.x + r, rect.min.y), pos2(rect.max.x - r, rect.max.y)), left, right);
 }
 
@@ -65,8 +76,9 @@ pub fn primary_button(ui: &mut Ui, text: &str, size: egui::Vec2, enabled: bool) 
     let hover = ui.ctx().animate_bool_with_time(resp.id, enabled && resp.hovered(), 0.12);
     let p = ui.painter();
     if enabled {
-        glow(p, rect, R_MD, ACCENT, 0.35 + 0.65 * hover);
+        glow(p, rect, R_MD, ACCENT, 0.3 + 0.5 * hover);
         hgradient_rounded(p, rect, lerp_color(ACCENT, ACCENT_HI, hover * 0.6), lerp_color(ACCENT_LO, ACCENT, hover * 0.4), R_MD);
+        p.rect_stroke(rect, CornerRadius::same(R_MD), Stroke::new(1.0_f32, with_alpha(ACCENT_HI, 150)), StrokeKind::Inside);
     } else {
         p.rect_filled(rect, CornerRadius::same(R_MD), SURFACE_3);
     }
@@ -128,8 +140,8 @@ pub fn ghost_button(ui: &mut Ui, icon: &str, text: &str) -> Response {
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.1);
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(R_SM), lerp_color(SURFACE_2, SURFACE_3, hover));
-    p.rect_stroke(rect, CornerRadius::same(R_SM), Stroke::new(1.0_f32, lerp_color(BORDER, BORDER_HI, hover)), StrokeKind::Inside);
+    p.rect_filled(rect, CornerRadius::same(R_MD), with_alpha(Color32::WHITE, (15.0 + 14.0 * hover) as u8));
+    p.rect_stroke(rect, CornerRadius::same(R_MD), Stroke::new(1.0_f32, with_alpha(Color32::WHITE, (38.0 + 22.0 * hover) as u8)), StrokeKind::Inside);
     p.galley(rect.center() - galley.size() / 2.0, galley, TEXT);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
@@ -142,23 +154,10 @@ pub fn danger_button(ui: &mut Ui, icon: &str, text: &str) -> Response {
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.1);
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(R_SM), with_alpha(DANGER, (18.0 + 30.0 * hover) as u8));
-    p.rect_stroke(rect, CornerRadius::same(R_SM), Stroke::new(1.0_f32, with_alpha(DANGER, 110)), StrokeKind::Inside);
+    p.rect_filled(rect, CornerRadius::same(R_MD), with_alpha(DANGER, (18.0 + 30.0 * hover) as u8));
+    p.rect_stroke(rect, CornerRadius::same(R_MD), Stroke::new(1.0_f32, with_alpha(DANGER, 110)), StrokeKind::Inside);
     p.galley(rect.center() - galley.size() / 2.0, galley, lerp_color(DANGER, Color32::WHITE, hover * 0.3));
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
-}
-
-/// Window control in the title bar (minimise / maximise / close).
-pub fn window_button(ui: &mut Ui, icon: &str, close: bool) -> Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(46.0, ui.available_height()), Sense::click());
-    let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.08);
-    let p = ui.painter();
-    if hover > 0.0 {
-        let c = if close { Color32::from_rgb(232, 17, 35) } else { Color32::WHITE };
-        p.rect_filled(rect, CornerRadius::ZERO, with_alpha(c, if close { (hover * 255.0) as u8 } else { (hover * 18.0) as u8 }));
-    }
-    p.text(rect.center(), Align2::CENTER_CENTER, icon, regular(15.0), if close && hover > 0.5 { Color32::WHITE } else { lerp_color(MUTED, TEXT, hover) });
-    resp
 }
 
 /// iOS-style switch.
@@ -171,7 +170,8 @@ pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
     }
     let t = ui.ctx().animate_bool_with_time(resp.id, *on, 0.15);
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(255), lerp_color(SURFACE_3, ACCENT, t));
+    p.rect_filled(rect, CornerRadius::same(255), lerp_color(with_alpha(Color32::WHITE, 34), ACCENT, t));
+    p.rect_stroke(rect, CornerRadius::same(255), Stroke::new(1.0_f32, with_alpha(Color32::WHITE, (46.0 * (1.0 - t)) as u8)), StrokeKind::Inside);
     let x = egui::lerp(rect.left() + 11.0..=rect.right() - 11.0, t);
     p.circle_filled(pos2(x, rect.center().y), 8.0, Color32::WHITE);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -196,10 +196,7 @@ pub fn toggle_row(ui: &mut Ui, title: &str, desc: &str, on: &mut bool) -> bool {
 
 /// Card container with an icon and a title.
 pub fn card<R>(ui: &mut Ui, title: &str, icon: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
-    Frame::new()
-        .fill(SURFACE)
-        .stroke(Stroke::new(1.0_f32, BORDER))
-        .corner_radius(CornerRadius::same(R_LG))
+    glass()
         .inner_margin(Margin::same(18))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -224,8 +221,13 @@ pub fn option_row(ui: &mut Ui, selected: bool, title: &str, badge: &str, desc: &
     let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.1);
     let sel = ui.ctx().animate_bool_with_time(resp.id.with("sel"), selected, 0.15);
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(R_MD), lerp_color(lerp_color(SURFACE_2, SURFACE_3, hover * 0.6), with_alpha(ACCENT, 28), sel));
-    p.rect_stroke(rect, CornerRadius::same(R_MD), Stroke::new(1.0_f32, lerp_color(BORDER, ACCENT, sel)), StrokeKind::Inside);
+    p.rect_filled(rect, CornerRadius::same(R_MD), lerp_color(with_alpha(Color32::WHITE, (8.0 + 8.0 * hover) as u8), with_alpha(ACCENT, 30), sel));
+    p.rect_stroke(
+        rect,
+        CornerRadius::same(R_MD),
+        Stroke::new(1.0_f32, lerp_color(with_alpha(Color32::WHITE, 24), with_alpha(ACCENT, 170), sel)),
+        StrokeKind::Inside,
+    );
     // Radio dot.
     let c = pos2(rect.left() + 18.0, rect.top() + 17.0);
     p.circle_stroke(c, 7.0, Stroke::new(1.5_f32, lerp_color(FAINT, ACCENT, sel)));

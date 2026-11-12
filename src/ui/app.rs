@@ -193,7 +193,12 @@ impl EraserApp {
             for loc in drives::fill_locations(d) {
                 let n = freespace::remove_leftovers(&loc);
                 if n > 0 {
-                    app.toasts.push(Toast { text: format!("Removed {n} leftover wipe folder(s) on {}", d.label), color: BLUE, icon: ph::BROOM, born: Instant::now() });
+                    app.toasts.push(Toast {
+                        text: format!("Removed {n} leftover wipe folder(s) on {}", d.label),
+                        color: BLUE,
+                        icon: ph::BROOM,
+                        born: Instant::now(),
+                    });
                 }
             }
         }
@@ -308,7 +313,16 @@ impl EraserApp {
             let scan = erase::scan(&paths);
             let _ = tx.send(JobDone::Files(erase::erase(scan, &opts, &p)));
         });
-        self.job = Some(Job { kind: JobKind::Files, method: self.settings.method, progress, started: Instant::now(), drive: None, rx, sample: (Instant::now(), 0), speed: 0.0 });
+        self.job = Some(Job {
+            kind: JobKind::Files,
+            method: self.settings.method,
+            progress,
+            started: Instant::now(),
+            drive: None,
+            rx,
+            sample: (Instant::now(), 0),
+            speed: 0.0,
+        });
         self.result = None;
         self.show_failures = false;
     }
@@ -481,22 +495,30 @@ impl EraserApp {
     }
 
     pub fn download_update(&mut self) {
-        let UpdateState::Available(info) = &self.update else { return };
+        let UpdateState::Available(info) = &self.update else {
+            return;
+        };
         let info = info.clone();
         self.update = UpdateState::Downloading { done: 0, total: 0 };
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let t2 = tx.clone();
-            let r = install::download_update(&info, &move |d, t| {
-                let _ = t2.send(Msg::UpdateProgress(d, t));
-            }, &|| false)
+            let r = install::download_update(
+                &info,
+                &move |d, t| {
+                    let _ = t2.send(Msg::UpdateProgress(d, t));
+                },
+                &|| false,
+            )
             .map_err(|e| format!("{e:#}"));
             let _ = tx.send(Msg::UpdateDownloaded(r, info.version.clone()));
         });
     }
 
     pub fn apply_update(&mut self, ctx: &egui::Context) {
-        let UpdateState::Ready { path, .. } = &self.update else { return };
+        let UpdateState::Ready { path, .. } = &self.update else {
+            return;
+        };
         match install::apply_update(path) {
             Ok(()) => {
                 self.exiting = true;
@@ -549,60 +571,43 @@ impl EraserApp {
     // Chrome
     // -----------------------------------------------------------------------------------------
 
-    fn title_bar(&mut self, ui: &mut egui::Ui) {
-        let rect = ui.max_rect();
-        let drag = ui.interact(rect, Id::new("title_drag"), Sense::click_and_drag());
-        if drag.drag_started_by(egui::PointerButton::Primary) {
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
-        }
-        if drag.double_clicked() {
-            let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
-        }
-        ui.horizontal_centered(|ui| {
-            ui.add_space(14.0);
-            if let Some(icon) = &self.app_icon {
-                ui.add(egui::Image::new(icon).fit_to_exact_size(vec2(20.0, 20.0)));
+    /// Update status in the sidebar footer (the system draws the title bar now).
+    fn update_chip(&mut self, ui: &mut egui::Ui) {
+        let label = match &self.update {
+            UpdateState::Available(i) => Some((format!("Update {} available", i.version), GOLD)),
+            UpdateState::Downloading { done, total, .. } => {
+                Some((if *total > 0 { format!("Downloading {:.0}%", *done as f32 * 100.0 / *total as f32) } else { "Downloading update…".into() }, BLUE))
             }
-            ui.add_space(4.0);
-            ui.label(RichText::new("FAST DISK").font(black(13.5)).color(TEXT).extra_letter_spacing(1.5));
-            ui.label(RichText::new("ERASER").font(semibold(13.0)).color(ACCENT_HI).extra_letter_spacing(1.5));
-
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                if window_button(ui, ph::X, true).clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-                let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
-                if window_button(ui, if max { ph::CORNERS_IN } else { ph::CORNERS_OUT }, false).clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
-                }
-                if window_button(ui, ph::MINUS, false).clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-                }
-                ui.add_space(10.0);
-                let label = match &self.update {
-                    UpdateState::Available(i) => Some((format!("Update {} available", i.version), GOLD)),
-                    UpdateState::Downloading { done, total, .. } => Some((
-                        if *total > 0 { format!("Downloading update {:.0}%", *done as f32 * 100.0 / *total as f32) } else { "Downloading update…".into() },
-                        BLUE,
-                    )),
-                    UpdateState::Ready { .. } => Some(("Restart to update".into(), GREEN)),
-                    _ => None,
-                };
-                if let Some((text, color)) = label {
-                    let r = chip(ui, ph::ARROW_CIRCLE_UP, &text, color).interact(Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    if r.clicked() {
-                        self.show_update_dialog = true;
-                    }
-                }
-            });
-        });
-        ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0_f32, BORDER));
+            UpdateState::Ready { .. } => Some(("Restart to update".into(), GREEN)),
+            _ => None,
+        };
+        if let Some((text, color)) = label {
+            let r = chip(ui, ph::ARROW_CIRCLE_UP, &text, color).interact(Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+            if r.clicked() {
+                self.show_update_dialog = true;
+            }
+        }
     }
 
     fn sidebar(&mut self, ui: &mut egui::Ui) {
-        ui.add_space(18.0);
+        // Brand, like Hyve's sidebar header.
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            if let Some(icon) = &self.app_icon {
+                ui.add(egui::Image::new(icon).fit_to_exact_size(vec2(34.0, 34.0)));
+            }
+            ui.add_space(2.0);
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                ui.label(RichText::new("Fast Disk Eraser").font(bold(15.5)).color(ACCENT_HI));
+                ui.label(RichText::new("made by Akulav").font(regular(11.5)).color(MUTED));
+            });
+        });
+        ui.add_space(12.0);
+        let y = ui.cursor().top();
+        ui.painter().hline(ui.max_rect().x_range(), y, Stroke::new(1.0_f32, GLASS_BORDER));
+        ui.add_space(12.0);
+
         let busy = self.job.is_some();
         let items = [
             (Page::Erase, ph::FILE_X, "Erase files"),
@@ -616,57 +621,22 @@ impl EraserApp {
                 Page::Settings if matches!(self.update, UpdateState::Available(_) | UpdateState::Ready { .. }) => Some("1".into()),
                 _ => None,
             };
-            let running_here = busy && self.job.as_ref().is_some_and(|j| matches!((j.kind, page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
+            let running_here =
+                busy && self.job.as_ref().is_some_and(|j| matches!((j.kind, page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
             if nav_item(ui, icon, label, self.page == page, badge.as_deref(), running_here).clicked() {
                 self.go(page);
             }
             ui.add_space(4.0);
         }
 
-        // Brand card pinned to the bottom.
-        let r = ui.max_rect();
-        let card = Rect::from_min_max(pos2(r.left() + 4.0, r.bottom() - 84.0), pos2(r.right() - 4.0, r.bottom() - 16.0));
-        let p = ui.painter();
-        p.rect_filled(card, CornerRadius::same(R_MD), SURFACE_2);
-        p.rect_stroke(card, CornerRadius::same(R_MD), Stroke::new(1.0_f32, BORDER), StrokeKind::Inside);
-        if let Some(icon) = &self.app_icon {
-            egui::Image::new(icon).paint_at(ui, Rect::from_min_size(card.min + vec2(12.0, 14.0), vec2(40.0, 40.0)));
-        }
-        p.text(card.min + vec2(62.0, 22.0), Align2::LEFT_CENTER, "Fast Disk Eraser", semibold(13.0), TEXT);
-        p.text(card.min + vec2(62.0, 40.0), Align2::LEFT_CENTER, format!("v{}", update::CURRENT_VERSION), regular(12.0), MUTED);
-        p.text(card.min + vec2(62.0, 55.0), Align2::LEFT_CENTER, "made by Akulav", semibold(11.0), ACCENT_HI);
-    }
-
-    fn resize_handles(&self, ctx: &egui::Context) {
-        use egui::viewport::ResizeDirection as D;
-        if ctx.input(|i| i.viewport().maximized.unwrap_or(false)) {
-            return;
-        }
-        let r = ctx.screen_rect();
-        let t = 5.0;
-        let zones = [
-            (Rect::from_min_max(r.left_top(), pos2(r.right(), r.top() + t)), D::North, egui::CursorIcon::ResizeVertical),
-            (Rect::from_min_max(pos2(r.left(), r.bottom() - t), r.right_bottom()), D::South, egui::CursorIcon::ResizeVertical),
-            (Rect::from_min_max(r.left_top(), pos2(r.left() + t, r.bottom())), D::West, egui::CursorIcon::ResizeHorizontal),
-            (Rect::from_min_max(pos2(r.right() - t, r.top()), r.right_bottom()), D::East, egui::CursorIcon::ResizeHorizontal),
-            (Rect::from_min_size(r.left_top(), vec2(t * 2.0, t * 2.0)), D::NorthWest, egui::CursorIcon::ResizeNwSe),
-            (Rect::from_min_size(pos2(r.right() - t * 2.0, r.top()), vec2(t * 2.0, t * 2.0)), D::NorthEast, egui::CursorIcon::ResizeNeSw),
-            (Rect::from_min_size(pos2(r.left(), r.bottom() - t * 2.0), vec2(t * 2.0, t * 2.0)), D::SouthWest, egui::CursorIcon::ResizeNeSw),
-            (Rect::from_min_size(r.right_bottom() - vec2(t * 3.0, t * 3.0), vec2(t * 3.0, t * 3.0)), D::SouthEast, egui::CursorIcon::ResizeNwSe),
-        ];
-        egui::Area::new(Id::new("resize_handles")).order(egui::Order::Debug).fixed_pos(r.min).interactable(true).show(ctx, |ui| {
-            for (i, (rect, dir, cursor)) in zones.into_iter().enumerate().rev() {
-                let resp = ui.interact(rect, Id::new(("resize", i)), Sense::drag());
-                if resp.hovered() || resp.dragged() {
-                    ctx.set_cursor_icon(cursor);
-                }
-                if resp.drag_started() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::BeginResize(dir));
-                }
-            }
+        // Footer: update status and version.
+        ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
+            ui.label(RichText::new(format!("Version {}", update::CURRENT_VERSION)).font(regular(11.5)).color(FAINT));
+            self.update_chip(ui);
+            let y = ui.cursor().bottom() - 4.0;
+            ui.painter().hline(ui.max_rect().x_range(), y, Stroke::new(1.0_f32, GLASS_BORDER));
         });
     }
-
     fn toasts_ui(&mut self, ctx: &egui::Context) {
         self.toasts.retain(|t| t.born.elapsed() < Duration::from_secs(5));
         if self.toasts.is_empty() {
@@ -746,9 +716,8 @@ impl EraserApp {
             ),
         };
         let hold = self.settings.hold_to_confirm && matches!(kind, Confirm::Erase | Confirm::FreeSpace(_));
-        let modal = egui::Modal::new(Id::new("confirm")).frame(
-            Frame::new().fill(SURFACE).stroke(Stroke::new(1.0_f32, BORDER)).corner_radius(CornerRadius::same(R_LG)).inner_margin(Margin::same(24)),
-        );
+        let modal = egui::Modal::new(Id::new("confirm"))
+            .frame(Frame::new().fill(SURFACE).stroke(Stroke::new(1.0_f32, BORDER)).corner_radius(CornerRadius::same(R_LG)).inner_margin(Margin::same(24)));
         let resp = modal.show(ctx, |ui| {
             ui.set_width(440.0);
             ui.horizontal(|ui| {
@@ -806,9 +775,8 @@ impl EraserApp {
         let mut close = false;
         let mut download = false;
         let mut apply = false;
-        let modal = egui::Modal::new(Id::new("update")).frame(
-            Frame::new().fill(SURFACE).stroke(Stroke::new(1.0_f32, BORDER)).corner_radius(CornerRadius::same(R_LG)).inner_margin(Margin::same(24)),
-        );
+        let modal = egui::Modal::new(Id::new("update"))
+            .frame(Frame::new().fill(SURFACE).stroke(Stroke::new(1.0_f32, BORDER)).corner_radius(CornerRadius::same(R_LG)).inner_margin(Margin::same(24)));
         let resp = modal.show(ctx, |ui| {
             ui.set_width(420.0);
             ui.horizontal(|ui| {
@@ -830,7 +798,10 @@ impl EraserApp {
                     ctx.request_repaint_after(Duration::from_millis(100));
                 }
                 UpdateState::Ready { version, .. } => {
-                    ui.label(RichText::new(format!("Version {version} is downloaded and verified (SHA-256). Restart to install it into the same folder.")).color(MUTED));
+                    ui.label(
+                        RichText::new(format!("Version {version} is downloaded and verified (SHA-256). Restart to install it into the same folder."))
+                            .color(MUTED),
+                    );
                 }
                 UpdateState::Failed(e) => {
                     ui.label(RichText::new(format!("The update failed: {e}")).color(DANGER));
@@ -849,7 +820,10 @@ impl EraserApp {
                     }
                     UpdateState::Ready { .. } => {
                         let busy = self.job.is_some();
-                        if primary_button(ui, &format!("{}  Restart & update", ph::ARROW_CLOCKWISE), vec2(200.0, 38.0), !busy).on_disabled_hover_text("Wait for the running erase to finish").clicked() {
+                        if primary_button(ui, &format!("{}  Restart & update", ph::ARROW_CLOCKWISE), vec2(200.0, 38.0), !busy)
+                            .on_disabled_hover_text("Wait for the running erase to finish")
+                            .clicked()
+                        {
                             apply = true;
                         }
                     }
@@ -881,12 +855,9 @@ impl EraserApp {
         let (mut go, mut skip) = (false, false);
         ui.add_space((ui.available_height() * 0.5 - 200.0).max(24.0));
         ui.vertical_centered(|ui| {
-            Frame::new()
-                .fill(SURFACE)
-                .stroke(Stroke::new(1.0_f32, BORDER))
-                .corner_radius(CornerRadius::same(R_LG))
-                .inner_margin(Margin::same(28))
-                .show(ui, |ui| {
+            Frame::new().fill(SURFACE).stroke(Stroke::new(1.0_f32, BORDER)).corner_radius(CornerRadius::same(R_LG)).inner_margin(Margin::same(28)).show(
+                ui,
+                |ui| {
                     ui.set_width(520.0_f32.min(ui.available_width()));
                     ui.with_layout(Layout::top_down(Align::Min), |ui| {
                         ui.horizontal(|ui| {
@@ -901,12 +872,20 @@ impl EraserApp {
                         ui.add_space(10.0);
                         match &offer {
                             Offer::Install { .. } => {
-                                ui.label(RichText::new("Choose a folder. The app and everything it saves (settings, history, updates) go there, and updates keep using it.").color(MUTED));
+                                ui.label(
+                                    RichText::new(
+                                        "Choose a folder. The app and everything it saves (settings, history, updates) go there, and updates keep using it.",
+                                    )
+                                    .color(MUTED),
+                                );
                                 ui.add_space(14.0);
                                 ui.label(RichText::new("Install folder").font(semibold(13.0)));
                                 ui.add_space(4.0);
                                 ui.horizontal(|ui| {
-                                    let edit = egui::TextEdit::singleline(&mut self.install_dir_edit).desired_width(ui.available_width() - 110.0).font(regular(13.5)).margin(Margin::symmetric(10, 8));
+                                    let edit = egui::TextEdit::singleline(&mut self.install_dir_edit)
+                                        .desired_width(ui.available_width() - 110.0)
+                                        .font(regular(13.5))
+                                        .margin(Margin::symmetric(10, 8));
                                     if ui.add(edit).changed() {
                                         self.install_error = None;
                                     }
@@ -954,14 +933,16 @@ impl EraserApp {
                             });
                         });
                     });
-                });
+                },
+            );
         });
         if skip {
             self.install_offer = Offer::None;
         }
         if go {
             let result = match &offer {
-                Offer::Install { .. } => install::parse_install_dir(&self.install_dir_edit).and_then(|root| install::install_and_launch(&root, &["--installed"]).map_err(|e| format!("{e:#}"))),
+                Offer::Install { .. } => install::parse_install_dir(&self.install_dir_edit)
+                    .and_then(|root| install::install_and_launch(&root, &["--installed"]).map_err(|e| format!("{e:#}"))),
                 Offer::Update { root, installed } => {
                     let from = installed.clone().unwrap_or_default();
                     install::install_and_launch(root, &["--updated-from", &from]).map_err(|e| format!("{e:#}"))
@@ -1021,12 +1002,13 @@ fn nav_item(ui: &mut egui::Ui, icon: &str, label: &str, active: bool, badge: Opt
     let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.1);
     let act = ui.ctx().animate_bool_with_time(resp.id.with("a"), active, 0.15);
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(R_MD), lerp_color(with_alpha(Color32::WHITE, (hover * 8.0) as u8), with_alpha(ACCENT, 30), act));
+    // Hyve's nav item: a faint hover, and for the current page an accent gradient with an accent border.
+    p.rect_filled(rect, CornerRadius::same(R_MD), with_alpha(Color32::WHITE, (hover * (1.0 - act) * 13.0) as u8));
     if act > 0.0 {
-        let bar = Rect::from_min_size(pos2(rect.left(), rect.center().y - 9.0 * act), vec2(3.0, 18.0 * act));
-        p.rect_filled(bar, CornerRadius::same(2), ACCENT);
+        hgradient_rounded(p, rect, with_alpha(ACCENT, (72.0 * act) as u8), with_alpha(ACCENT, (20.0 * act) as u8), R_MD);
+        p.rect_stroke(rect, CornerRadius::same(R_MD), Stroke::new(1.0_f32, with_alpha(ACCENT, (90.0 * act) as u8)), StrokeKind::Inside);
     }
-    let col = lerp_color(MUTED, TEXT, act.max(hover));
+    let col = lerp_color(lerp_color(MUTED, TEXT, 0.55), TEXT, act.max(hover));
     p.text(pos2(rect.left() + 16.0, rect.center().y), Align2::LEFT_CENTER, icon, regular(18.0), lerp_color(col, ACCENT_HI, act));
     p.text(pos2(rect.left() + 44.0, rect.center().y), Align2::LEFT_CENTER, label, semibold(13.5), col);
     if running {
@@ -1065,11 +1047,10 @@ impl eframe::App for EraserApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
+        paint_backdrop(ctx);
         if self.install_offer != Offer::None {
-            egui::TopBottomPanel::top("title_bar").exact_height(42.0).frame(Frame::new().fill(SURFACE)).show(ctx, |ui| self.title_bar(ui));
-            egui::CentralPanel::default().frame(Frame::new().fill(BG)).show(ctx, |ui| self.install_screen(ui));
+            egui::CentralPanel::default().frame(Frame::new()).show(ctx, |ui| self.install_screen(ui));
             self.toasts_ui(ctx);
-            self.resize_handles(ctx);
             return;
         }
 
@@ -1085,26 +1066,25 @@ impl eframe::App for EraserApp {
             self.refresh_drives();
         }
 
-        egui::TopBottomPanel::top("title_bar").exact_height(42.0).frame(Frame::new().fill(SURFACE)).show(ctx, |ui| self.title_bar(ui));
-        egui::SidePanel::left("sidebar")
-            .exact_width(220.0)
-            .resizable(false)
-            .frame(Frame::new().fill(SURFACE).inner_margin(Margin { left: 12, right: 12, top: 0, bottom: 0 }))
-            .show(ctx, |ui| {
-                let r = ui.max_rect();
-                ui.painter().vline(r.right() + 11.5, r.y_range(), Stroke::new(1.0_f32, BORDER));
-                self.sidebar(ui)
-            });
+        // A floating glass sidebar, like Hyve's.
+        egui::SidePanel::left("sidebar").exact_width(250.0).resizable(false).show_separator_line(false).frame(Frame::new()).show(ctx, |ui| {
+            let gap = GAP as f32;
+            let panel = Rect::from_min_max(ui.max_rect().min + vec2(gap, gap), ui.max_rect().max - vec2(0.0, gap));
+            ui.painter().rect(panel, CornerRadius::same(R_LG), GLASS, Stroke::new(1.0_f32, GLASS_BORDER), StrokeKind::Inside);
+            ui.scope_builder(egui::UiBuilder::new().max_rect(panel.shrink(12.0)), |ui| self.sidebar(ui));
+        });
 
         let fade = (self.page_since.elapsed().as_secs_f32() / 0.2).min(1.0);
         let fade = 1.0 - (1.0 - fade).powi(3);
         if fade < 1.0 {
             ctx.request_repaint();
         }
-        egui::CentralPanel::default().frame(Frame::new().fill(BG).inner_margin(Margin::same(28))).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(Frame::new().inner_margin(Margin { left: 30, right: 28, top: 26, bottom: 20 })).show(ctx, |ui| {
             ui.set_opacity(fade);
-            let job_here = self.job.as_ref().is_some_and(|j| matches!((j.kind, self.page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
-            let result_here = self.result.as_ref().is_some_and(|r| matches!((r.kind, self.page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
+            let job_here =
+                self.job.as_ref().is_some_and(|j| matches!((j.kind, self.page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
+            let result_here =
+                self.result.as_ref().is_some_and(|r| matches!((r.kind, self.page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
             if job_here {
                 super::pages::job_view(self, ui);
             } else if result_here {
@@ -1123,7 +1103,6 @@ impl eframe::App for EraserApp {
         self.update_dialog(ctx);
         self.drop_overlay(ctx);
         self.toasts_ui(ctx);
-        self.resize_handles(ctx);
 
         if self.job.is_some() {
             ctx.request_repaint_after(Duration::from_millis(100));

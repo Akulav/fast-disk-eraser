@@ -33,7 +33,7 @@ fn main() -> eframe::Result<()> {
         .with_app_id("fast-disk-eraser")
         .with_inner_size([1120.0, 720.0])
         .with_min_inner_size([900.0, 600.0])
-        .with_decorations(false)
+        .with_decorations(true)
         .with_transparent(false)
         .with_drag_and_drop(true)
         .with_resizable(true);
