@@ -16,6 +16,7 @@ No telemetry. No ads. No bloat. One file per system that installs and updates it
 ![Linux](https://img.shields.io/badge/Linux-x64-FCC624?style=flat-square&logo=linux&logoColor=black)
 ![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?style=flat-square&logo=apple&logoColor=white)
 ![Rust](https://img.shields.io/badge/made%20with-Rust-B7410E?style=flat-square&logo=rust&logoColor=white)
+![License](https://img.shields.io/badge/license-source--available-5c6270?style=flat-square)
 
 ### [⬇ Download the latest release](https://github.com/Akulav/fast-disk-eraser/releases/latest)
 
@@ -99,7 +100,10 @@ FastDiskEraser --version
 
 Methods: `random` (default), `zero`, `dod3`, `dod7`, `schneier`. Without `--yes` it asks before erasing.
 
-## 🛠️ Building
+<details>
+<summary><b>🛠️ For maintainers: building and releases</b></summary>
+
+### Building from source
 
 Needs a recent stable [Rust](https://rustup.rs).
 
@@ -118,16 +122,27 @@ iscc /DAppVersion=1.0.0 installer\fast-disk-eraser.iss
 
 The setup lands in `dist/`. `assets/make_icons.py` regenerates the icon, banner and installer images.
 
-### Releasing
+### Publishing a release
 
-Bump `version` in `Cargo.toml` and push to `main`. The [build workflow](.github/workflows/build.yml) builds and tests all three systems and, when no release with that version exists yet, tags the commit and publishes the release with the three files and `SHA256SUMS.txt`.
+1. Bump `version` in `Cargo.toml`.
+2. Push to `main`.
+3. The [build workflow](.github/workflows/build.yml) tests and builds all three systems and, when no release with that
+   version exists yet, tags the commit and publishes the release with exactly three programs,
+   `FastDiskEraser-setup.exe`, `FastDiskEraser-linux-x64` and `FastDiskEraser-macos-arm64`, plus `SHA256SUMS.txt`.
 
-## 📜 License
+</details>
 
-See [LICENSE](LICENSE). Bundled fonts: Inter (SIL Open Font License, see `assets/fonts/Inter-OFL-1.1.txt`) and DejaVu Sans Mono.
+## 🙏 Credits
+
+Icons by [Phosphor Icons](https://phosphoricons.com) (MIT). Inter font by Rasmus Andersson (SIL OFL 1.1, see `assets/fonts`).
+DejaVu Sans Mono (Bitstream Vera license).
+
+---
 
 <div align="center">
 
-Made by **Akulav**
+**Made with ❤️ by [Akulav](https://github.com/Akulav)**
+
+<sub>© 2026 Akulav. Source-available under the <a href="LICENSE">Akulav Source-Available License</a>.</sub>
 
 </div>
