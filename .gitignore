@@ -2,3 +2,5 @@
 /dist
 *.ron
 __pycache__/
+# graphify knowledge graph (local, rebuilt with `graphify update .`)
+graphify-out/
