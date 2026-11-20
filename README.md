@@ -132,6 +132,11 @@ The setup lands in `dist/`. `assets/make_icons.py` regenerates the icon, banner 
 
 </details>
 
+## 📚 Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it works inside and where each piece of the code lives
+- [CLAUDE.md](CLAUDE.md): notes and rules for working on the code
+
 ## 🙏 Credits
 
 Icons by [Phosphor Icons](https://phosphoricons.com) (MIT). Inter font by Rasmus Andersson (SIL OFL 1.1, see `assets/fonts`).
