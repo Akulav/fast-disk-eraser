@@ -290,3 +290,45 @@ pub fn callout(ui: &mut Ui, icon: &str, color: Color32, text: &str) {
             });
         });
 }
+
+/// Run `add` in a column at most `max_w` wide, centred in the space that is left: pages grow with the window up
+/// to that width and stay centred beyond it.
+pub fn centered(ui: &mut Ui, max_w: f32, add: impl FnOnce(&mut Ui)) {
+    let avail = ui.available_rect_before_wrap();
+    let w = avail.width().min(max_w);
+    let rect = Rect::from_min_size(pos2(avail.center().x - w / 2.0, avail.top()), vec2(w, avail.height()));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), add);
+    ui.allocate_rect(avail, Sense::hover());
+}
+
+/// Windows 11 style tab strip: equal tabs in a flat bar, the current one lifted and marked with the accent.
+/// Returns true when the selection changed.
+pub fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], current: &mut usize) -> bool {
+    let h = 36.0;
+    let (bar, _) = ui.allocate_exact_size(vec2(ui.available_width(), h + 8.0), Sense::hover());
+    let p = ui.painter().clone();
+    p.rect(bar, CornerRadius::same(R_LG), with_alpha(Color32::BLACK, 50), Stroke::new(1.0_f32, BORDER), StrokeKind::Inside);
+    let inner = bar.shrink(4.0);
+    let n = tabs.len().max(1) as f32;
+    let w = (inner.width() - 4.0 * (n - 1.0)) / n;
+    let mut changed = false;
+    for (i, (icon, label)) in tabs.iter().enumerate() {
+        let r = Rect::from_min_size(pos2(inner.left() + i as f32 * (w + 4.0), inner.top()), vec2(w, h));
+        let resp = ui.interact(r, ui.id().with(("tab", i)), Sense::click());
+        let on = *current == i;
+        let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.1);
+        let fill = if on { with_alpha(Color32::WHITE, 20) } else { with_alpha(Color32::WHITE, (hover * 12.0) as u8) };
+        p.rect_filled(r, CornerRadius::same(R_MD), fill);
+        if on {
+            let line = Rect::from_min_max(pos2(r.center().x - 14.0, r.bottom() - 3.0), pos2(r.center().x + 14.0, r.bottom()));
+            p.rect_filled(line, CornerRadius::same(2), ACCENT);
+        }
+        let text = if icon.is_empty() { label.to_string() } else { format!("{icon}  {label}") };
+        p.text(r.center(), Align2::CENTER_CENTER, text, semibold(13.5), if on { TEXT } else { lerp_color(MUTED, TEXT, hover) });
+        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() && !on {
+            *current = i;
+            changed = true;
+        }
+    }
+    changed
+}

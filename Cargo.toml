@@ -1,6 +1,6 @@
 [package]
 name = "fast-disk-eraser"
-version = "1.2.0"
+version = "1.3.0"
 edition = "2021"
 authors = ["Akulav"]
 description = "Fast Disk Eraser - securely erase files, folders and free disk space, made by Akulav"

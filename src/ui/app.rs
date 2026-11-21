@@ -101,6 +101,8 @@ pub struct EraserApp {
     pub settings: Settings,
     pub history: Vec<HistoryEntry>,
     pub page: Page,
+    /// Which Settings tab is open.
+    pub settings_tab: usize,
     page_since: Instant,
     app_icon: Option<egui::TextureHandle>,
 
@@ -155,6 +157,7 @@ impl EraserApp {
             settings,
             history,
             page: Page::Erase,
+            settings_tab: 0,
             page_since: Instant::now(),
             app_icon,
             queue: Vec::new(),
@@ -1084,18 +1087,27 @@ impl eframe::App for EraserApp {
                 self.job.as_ref().is_some_and(|j| matches!((j.kind, self.page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
             let result_here =
                 self.result.as_ref().is_some_and(|r| matches!((r.kind, self.page), (JobKind::Files, Page::Erase) | (JobKind::FreeSpace, Page::FreeSpace)));
-            if job_here {
-                super::pages::job_view(self, ui);
-            } else if result_here {
-                super::pages::result_view(self, ui);
-            } else {
-                match self.page {
-                    Page::Erase => super::pages::erase_page(self, ui),
-                    Page::FreeSpace => super::pages::free_space_page(self, ui),
-                    Page::History => super::pages::history_page(self, ui),
-                    Page::Settings => super::pages::settings_page(self, ui),
+            // Every page sits in a centred column that grows with the window up to its width.
+            let max_w = match self.page {
+                _ if job_here || result_here => 1400.0,
+                Page::Erase | Page::FreeSpace => 1400.0,
+                Page::History => 1100.0,
+                Page::Settings => 900.0,
+            };
+            super::widgets::centered(ui, max_w, |ui| {
+                if job_here {
+                    super::pages::job_view(self, ui);
+                } else if result_here {
+                    super::pages::result_view(self, ui);
+                } else {
+                    match self.page {
+                        Page::Erase => super::pages::erase_page(self, ui),
+                        Page::FreeSpace => super::pages::free_space_page(self, ui),
+                        Page::History => super::pages::history_page(self, ui),
+                        Page::Settings => super::pages::settings_page(self, ui),
+                    }
                 }
-            }
+            });
         });
 
         self.confirm_ui(ctx);

@@ -4,6 +4,13 @@ All notable changes to Fast Disk Eraser are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 Older versions are described on the [releases page](https://github.com/Akulav/fast-disk-eraser/releases).
 
+## [1.3.0] - 2026-11-21
+
+### Changed
+- **Centred pages that grow with the window:** every page sits in a centred column instead of hugging the left edge,
+  and the Method / Options column is wider, so a maximized window shows everything without scrolling.
+- **Settings in tabs:** Erasing, Updates, Storage and About, each on its own screen.
+
 ## [1.2.0] - 2026-11-21
 
 ### Changed

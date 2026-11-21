@@ -16,7 +16,7 @@ use crate::core::drives::DriveKind;
 use crate::core::method::Method;
 use crate::core::{format_bytes, format_duration};
 
-const SIDE_W: f32 = 320.0;
+const SIDE_W: f32 = 420.0;
 
 fn header(ui: &mut Ui, kick: &str, title: &str, subtitle: &str) {
     kicker(ui, kick);
@@ -558,12 +558,14 @@ pub fn history_page(app: &mut EraserApp, ui: &mut Ui) {
 
 pub fn settings_page(app: &mut EraserApp, ui: &mut Ui) {
     header(ui, "Settings", "Make it yours", "Defaults, updates and where the app keeps its files.");
+    tab_strip(ui, &[(ph::SLIDERS, "Erasing"), (ph::ARROW_CIRCLE_UP, "Updates"), (ph::FOLDER_OPEN, "Storage"), (ph::HEART, "About")], &mut app.settings_tab);
+    ui.add_space(14.0);
+    let tab = app.settings_tab;
     ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-        ui.set_max_width(760.0);
-        card(ui, "Erasing", ph::SLIDERS, |ui| {
+        if tab == 0 { card(ui, "Erasing", ph::SLIDERS, |ui| {
             let mut changed = false;
             ui.horizontal(|ui| {
-                let w = ui.available_width() - 230.0;
+                let w = ui.available_width() - 300.0; // room for the slider and its value box
                 ui.vertical(|ui| {
                     ui.set_width(w);
                     ui.label(RichText::new("Files at the same time").font(semibold(13.5)));
@@ -578,10 +580,9 @@ pub fn settings_page(app: &mut EraserApp, ui: &mut Ui) {
             if changed {
                 app.settings_changed();
             }
-        });
-        ui.add_space(12.0);
+        }); }
 
-        card(ui, "Updates", ph::ARROW_CIRCLE_UP, |ui| {
+        if tab == 1 { card(ui, "Updates", ph::ARROW_CIRCLE_UP, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label(RichText::new(format!("Version {}", update::CURRENT_VERSION)).font(bold(15.0)));
@@ -621,10 +622,9 @@ pub fn settings_page(app: &mut EraserApp, ui: &mut Ui) {
             if toggle_row(ui, "Check automatically", "Look for a new version when the app starts and every few hours.", &mut app.settings.check_updates) {
                 app.settings_changed();
             }
-        });
-        ui.add_space(12.0);
+        }); }
 
-        card(ui, "Storage", ph::FOLDER_OPEN, |ui| {
+        if tab == 2 { card(ui, "Storage", ph::FOLDER_OPEN, |ui| {
             ui.label(RichText::new("Everything the app saves stays in its own folder: settings, history, window position and downloaded updates. Nothing goes to AppData, ~/.local/share or the temp folder.").font(regular(12.5)).color(MUTED));
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -649,10 +649,9 @@ pub fn settings_page(app: &mut EraserApp, ui: &mut Ui) {
                     });
                 });
             }
-        });
-        ui.add_space(12.0);
+        }); }
 
-        card(ui, "About", ph::HEART, |ui| {
+        if tab == 3 { card(ui, "About", ph::HEART, |ui| {
             ui.horizontal(|ui| {
                 if let Some(icon) = app.app_icon() {
                     ui.add(egui::Image::new(icon).fit_to_exact_size(vec2(54.0, 54.0)));
@@ -669,7 +668,7 @@ pub fn settings_page(app: &mut EraserApp, ui: &mut Ui) {
                     });
                 });
             });
-        });
+        }); }
         ui.add_space(20.0);
     });
 }
