@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use egui::{pos2, vec2, Align, Align2, Color32, CornerRadius, Frame, Id, Layout, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
+use egui::{pos2, vec2, Align, Align2, Color32, CornerRadius, Frame, Id, Layout, Margin, Rect, RichText, Sense, Stroke};
 use egui_phosphor::regular as ph;
 
 use super::theme::*;
@@ -590,7 +590,7 @@ impl EraserApp {
     }
 
     fn sidebar(&mut self, ui: &mut egui::Ui) {
-        // Brand, like Hyve's sidebar header.
+        // Brand, at the top of the navigation pane.
         ui.add_space(2.0);
         ui.horizontal(|ui| {
             if let Some(icon) = &self.app_icon {
@@ -599,7 +599,7 @@ impl EraserApp {
             ui.add_space(2.0);
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 0.0;
-                ui.label(RichText::new("Fast Disk Eraser").font(bold(15.5)).color(ACCENT_HI));
+                ui.label(RichText::new("Fast Disk Eraser").font(semibold(15.5)).color(TEXT));
                 ui.label(RichText::new("made by Akulav").font(regular(11.5)).color(MUTED));
             });
         });
@@ -1002,14 +1002,14 @@ fn nav_item(ui: &mut egui::Ui, icon: &str, label: &str, active: bool, badge: Opt
     let hover = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.1);
     let act = ui.ctx().animate_bool_with_time(resp.id.with("a"), active, 0.15);
     let p = ui.painter();
-    // Hyve's nav item: a faint hover, and for the current page an accent gradient with an accent border.
-    p.rect_filled(rect, CornerRadius::same(R_MD), with_alpha(Color32::WHITE, (hover * (1.0 - act) * 13.0) as u8));
+    // Windows 11's nav item: a faint layer on hover and on the current page, which also gets the accent pill.
+    p.rect_filled(rect, CornerRadius::same(R_MD), with_alpha(Color32::WHITE, (hover.max(act) * 11.0) as u8));
     if act > 0.0 {
-        hgradient_rounded(p, rect, with_alpha(ACCENT, (72.0 * act) as u8), with_alpha(ACCENT, (20.0 * act) as u8), R_MD);
-        p.rect_stroke(rect, CornerRadius::same(R_MD), Stroke::new(1.0_f32, with_alpha(ACCENT, (90.0 * act) as u8)), StrokeKind::Inside);
+        let pill = Rect::from_center_size(pos2(rect.left() + 1.5, rect.center().y), vec2(3.0, 16.0 * act));
+        p.rect_filled(pill, CornerRadius::same(2), ACCENT);
     }
     let col = lerp_color(lerp_color(MUTED, TEXT, 0.55), TEXT, act.max(hover));
-    p.text(pos2(rect.left() + 16.0, rect.center().y), Align2::LEFT_CENTER, icon, regular(18.0), lerp_color(col, ACCENT_HI, act));
+    p.text(pos2(rect.left() + 16.0, rect.center().y), Align2::LEFT_CENTER, icon, regular(18.0), lerp_color(col, ACCENT, act));
     p.text(pos2(rect.left() + 44.0, rect.center().y), Align2::LEFT_CENTER, label, semibold(13.5), col);
     if running {
         let t = ui.input(|i| i.time) as f32;
@@ -1017,11 +1017,11 @@ fn nav_item(ui: &mut egui::Ui, icon: &str, label: &str, active: bool, badge: Opt
         p.circle_filled(pos2(rect.right() - 18.0, rect.center().y), 4.0, with_alpha(ACCENT, a as u8));
         ui.ctx().request_repaint_after(Duration::from_millis(50));
     } else if let Some(b) = badge {
-        let g = p.layout_no_wrap(b.to_string(), bold(11.0), Color32::WHITE);
+        let g = p.layout_no_wrap(b.to_string(), bold(11.0), ON_ACCENT);
         let w = (g.size().x + 12.0).max(20.0);
         let r = Rect::from_center_size(pos2(rect.right() - 12.0 - w / 2.0, rect.center().y), vec2(w, 20.0));
-        p.rect_filled(r, CornerRadius::same(255), ACCENT_LO);
-        p.galley(r.center() - g.size() / 2.0, g, Color32::WHITE);
+        p.rect_filled(r, CornerRadius::same(255), ACCENT);
+        p.galley(r.center() - g.size() / 2.0, g, ON_ACCENT);
     }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
@@ -1066,11 +1066,10 @@ impl eframe::App for EraserApp {
             self.refresh_drives();
         }
 
-        // A floating glass sidebar, like Hyve's.
+        // Windows 11's navigation pane: flat on the window background, no card around it.
         egui::SidePanel::left("sidebar").exact_width(250.0).resizable(false).show_separator_line(false).frame(Frame::new()).show(ctx, |ui| {
             let gap = GAP as f32;
             let panel = Rect::from_min_max(ui.max_rect().min + vec2(gap, gap), ui.max_rect().max - vec2(0.0, gap));
-            ui.painter().rect(panel, CornerRadius::same(R_LG), GLASS, Stroke::new(1.0_f32, GLASS_BORDER), StrokeKind::Inside);
             ui.scope_builder(egui::UiBuilder::new().max_rect(panel.shrink(12.0)), |ui| self.sidebar(ui));
         });
 

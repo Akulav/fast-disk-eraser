@@ -139,7 +139,7 @@ The setup lands in `dist/`. `assets/make_icons.py` regenerates the icon, banner 
 
 ## 🙏 Credits
 
-Icons by [Phosphor Icons](https://phosphoricons.com) (MIT). Inter font by Rasmus Andersson (SIL OFL 1.1, see `assets/fonts`).
+Icons by [Phosphor Icons](https://phosphoricons.com) (MIT). Segoe UI on Windows (the system's font); elsewhere Inter by Rasmus Andersson (SIL OFL 1.1, see `assets/fonts`).
 DejaVu Sans Mono (Bitstream Vera license).
 
 ---

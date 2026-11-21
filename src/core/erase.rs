@@ -163,15 +163,40 @@ pub fn protected_reason(path: &Path, protected: &[PathBuf]) -> Option<String> {
             return Some("This is your home folder. Pick the files or folders inside it instead.".into());
         }
     }
-    let system: &[&str] = if cfg!(windows) {
-        &["c:/windows", "c:/program files", "c:/program files (x86)", "c:/programdata", "c:/users"]
+    let mut system: Vec<String> = if cfg!(windows) {
+        ["c:/windows", "c:/program files", "c:/program files (x86)", "c:/programdata", "c:/users"].map(String::from).to_vec()
     } else if cfg!(target_os = "macos") {
-        &["/system", "/library", "/applications", "/users", "/bin", "/sbin", "/usr", "/private", "/etc", "/var", "/opt"]
+        ["/system", "/library", "/applications", "/users", "/bin", "/sbin", "/usr", "/private", "/etc", "/var", "/opt"].map(String::from).to_vec()
     } else {
-        &["/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", "/opt", "/proc", "/root", "/run", "/sbin", "/srv", "/sys", "/usr", "/var"]
+        ["/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", "/opt", "/proc", "/root", "/run", "/sbin", "/srv", "/sys", "/usr", "/var"]
+            .map(String::from)
+            .to_vec()
     };
-    if system.iter().any(|s| c == *s) {
+    // Windows isn't always on C: — take the real folders from the environment as well.
+    let mut windows_dir = None;
+    if cfg!(windows) {
+        for var in ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"] {
+            if let Some(v) = std::env::var_os(var) {
+                let p = PathBuf::from(v);
+                let n = norm(&std::fs::canonicalize(&p).unwrap_or(p));
+                if var == "SystemRoot" {
+                    windows_dir = Some(n.clone());
+                }
+                system.push(n);
+            }
+        }
+        if let Some(home) = dirs::home_dir().and_then(|h| h.parent().map(Path::to_path_buf)) {
+            system.push(norm(&std::fs::canonicalize(&home).unwrap_or(home)));
+        }
+    }
+    if system.contains(&c) {
         return Some("This is a system folder; erasing it would break your computer.".into());
+    }
+    // Nothing inside the Windows folder is the user's to shred (System32, WinSxS, drivers…).
+    for w in windows_dir.iter().chain(std::iter::once(&"c:/windows".to_string())).filter(|_| cfg!(windows)) {
+        if c.starts_with(&format!("{w}/")) {
+            return Some("This is inside the Windows folder; erasing it would break your computer.".into());
+        }
     }
     for p in protected {
         let pn = norm(&std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()));
@@ -454,5 +479,10 @@ mod tests {
         let other = d.path().join("other");
         std::fs::create_dir_all(&other).unwrap();
         assert!(protected_reason(&other, &[app]).is_none());
+        // Only checked, never erased: the Windows folder (wherever it is) and everything inside it.
+        if let Some(sys) = std::env::var_os("SystemRoot").filter(|_| cfg!(windows)).map(PathBuf::from) {
+            assert!(protected_reason(&sys, &[]).is_some());
+            assert!(protected_reason(&sys.join("System32"), &[]).is_some());
+        }
     }
 }
